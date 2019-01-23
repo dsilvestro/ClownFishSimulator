@@ -1,4 +1,5 @@
-# ClownFishSimulator
+# micro2macroEvolution
+Forward individual-based simulations of evolution to link microevolutionary processes to macroevolution. 
 
 #### ClownSimulator.py
 Work in progress...
