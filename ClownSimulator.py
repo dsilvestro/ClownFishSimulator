@@ -21,21 +21,24 @@ replace_no_going_up=0.005
 
 w_dir = "/Users/danielesilvestro/Software/micro2macroEvolution"
 
-rseed = 87 #np.random.randint(100)
+rseed = np.random.randint(100)
 random.seed(rseed)
 np.random.seed(rseed)
 print("random seed:", rseed)
 
 
 """
-
-DONE: fraction_of_larvae_spB should be a fraction of the amount of larvae in the pool (not a probability)
-
-DONE: Move recombination to within female/male
+TO DO:
 
 amount of admixture could affect death of adults (worst being 50/50 A and B) <- Beta distribution
 
 prob of a larva from the pool to enter anemonis could be a function of admixture as well
+
+DONE: plot individuals by colony: eg shape by hierachy, Y-axis by nDNA admixture, color by mtDNA
+
+DONE: fraction_of_larvae_spB should be a fraction of the amount of larvae in the pool (not a probability)
+
+DONE: Move recombination to within female/male
 
 DONE: make hybridation rate decrease through time?
 
@@ -232,12 +235,11 @@ plt.plot(range(n_time_steps),spB_nucleus)
 plt.gca().set_ylim(Ylim)
 plt.gca().set_title('Overall fraction of spA nDNA')
 
-fig.add_subplot(222)
 plt.plot(range(n_time_steps),spB_mitoc)
 plt.gca().set_ylim(Ylim)
 plt.gca().set_title('Overall fraction of spA mtDNA')
 
-fig.add_subplot(223)
+fig.add_subplot(222)
 plt.plot(range(n_time_steps),nDNA_indApure,color= "blue")
 plt.plot(range(n_time_steps),nDNA_indBpure,color= "orange")
 plt.plot(range(n_time_steps),spB_mitoc,color= "green")
@@ -245,28 +247,47 @@ plt.gca().set_ylim(Ylim)
 plt.gca().set_title('spA nDNA (blue), spA mtDNA (green), spB nDNA (orange)')
 
 
-fig.add_subplot(224)
+fig.add_subplot(223)
 mtDNA[mtDNA<=1] = 0
 mtDNA[mtDNA>1] = 1
-#colors = np.array(["blue","red"])
-plt.plot(nDNAadmixture[mtDNA==0],"bo",color="blue") 
-plt.plot(nDNAadmixture[mtDNA==1],"bo",color="red") 
+colors = np.array(["blue","red"])
+plt.scatter(np.arange(len(nDNAadmixture)),nDNAadmixture,marker="o",color=colors[mtDNA]) 
+#plt.plot(nDNAadmixture[mtDNA==1],"bo",color="red") 
 plt.gca().set_ylim(Ylim)
 plt.gca().set_title('0: pure spA nDNA, 1: pure spB nDNA')
 	
 legend = """
-A) overall fraction of spA nDNA
-B) overall fraction of spA mtDNA
-C) fraction of individuals with pure spA nDNA (blue)
+A) overall fraction of spA nDNA (blue) and overall fraction of spA mtDNA (green)
+B) fraction of individuals with pure spA nDNA (blue)
    fraction of individuals with pure spA mtDNA (green)
    fraction of individuals with pure spB nDNA (orange)
-D) final individuals (0: pure spA nDNA, 1: pure spB nDNA)
+C) final individuals (0: pure spA nDNA, 1: pure spB nDNA)
    blue circles: spA mtDNA; red: spB mtDNA
-   
-
+D) final individuals by colony
+   0: pure spA nDNA, 1: pure spB nDNA
+   blue: spA mtDNA; red: spB mtDNA
+   '+' female, '*' male, 'o' others 
 """
+
+fig.add_subplot(224)
+colors = np.array(["blue","red"])
+shapes = np.array(["o","+","*"])
+
+hierarchy[hierarchy>1] = 2
+
+plt.scatter(colony_ind[hierarchy==0], nDNAadmixture[hierarchy==0],marker="+",color=colors[mtDNA[hierarchy==0]], alpha=1) 
+plt.scatter(colony_ind[hierarchy==1], nDNAadmixture[hierarchy==1],marker="*",color=colors[mtDNA[hierarchy==1]], alpha=1) 
+plt.scatter(colony_ind[hierarchy==2], nDNAadmixture[hierarchy==2],marker="o",color=colors[mtDNA[hierarchy==2]], alpha=0.3) 
+
+
+#plt.scatter(colony_ind[mtDNA==0], nDNAadmixture[mtDNA==0],marker=(5, 0),color="blue") 
+#plt.scatter(colony_ind[mtDNA==1], nDNAadmixture[mtDNA==1],marker="+",color="red") 
+plt.gca().set_ylim(Ylim)
+plt.gca().set_title('0: pure spA nDNA, 1: pure spB nDNA')
+
+
 print(legend)
-file_name = "%s/plot_%s_.pdf" % (w_dir,rseed)
+file_name = "%s/plot_r%s.pdf" % (w_dir,rseed)
 plt.savefig(file_name)
 #plt.show()
 
