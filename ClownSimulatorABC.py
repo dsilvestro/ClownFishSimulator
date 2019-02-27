@@ -7,79 +7,93 @@ import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import matplotlib.axes
 import matplotlib.backends.backend_pdf
-import argparse, sys
+import argparse, sys, os
+import scipy.stats
+
+p = argparse.ArgumentParser() #description='<input file>') 
+p.add_argument('-out',    type=int, help='out name', default= 1, metavar= 1)
+args = p.parse_args()
 
 
-w_dir = "/Users/danielesilvestro/Software/micro2macroEvolution"
-logfile_name = "%s/abc_R3.log" % (w_dir)
+w_dir = max(os.path.dirname(sys.argv[0]), os.getcwd())
+logfile_name = "%s/abc_fixSteepnessR%s.log" % (w_dir,args.out)
 mcmc_logfile = open(logfile_name , "w",0) 
-mcmc_logfile.write('\t'.join(["it","accepted","max_fraction_of_larvae_spB","mid_point","steepness","replace_no_going_up"])+'\n')
+head = ["it","accepted","max_fraction_of_larvae_spB","mid_point","steepness","max_death_rate_hybrid","rseed"]
+#  fraction of spB mtDNA, median admixture (>80% spA), admixt individuals (>80% spA) with spB mtDNA
+for i in range(10):
+	head.append("spBmtDNA_%s\tspAadmix_%s\tmixAB_%s" % (i,i,i) )
+mcmc_logfile.write('\t'.join(head)+'\n')
 
-
+plot = 0 # set to 1 to run the PDF plots
 abc_iteration=0
-while abc_iteration < 1000:
-	rseed = np.random.randint(0,100000)
-	random.seed(rseed)
-	np.random.seed(rseed)
-	print("random seed:", rseed)
+verbose = 0 
+target_samples = 1000
+fix_seed = 0
+abc_iter = 0
+
+while abc_iteration < target_samples:
+	if fix_seed:
+		rseed = np.random.randint(0,100000)
+		random.seed(rseed)
+		np.random.seed(rseed)
+	else: rseed = abc_iter
 	
-	verbose = 0 
 	colony_size = 5
 	n_colonies = 20
 	n_loci = 1000
 	n_larvae = 25
-	recomb_freq = 0.05 # avg fraction of alleles recombining
+	recomb_freq = 0.03 # avg fraction of alleles recombining
 	n_time_steps = 3000
 
-	max_fraction_of_larvae_spB = np.random.choice(np.linspace(0.01,0.25,10)) # max freq. of spB larvae at time 0
-	#rate_fraction_of_larvae_spB_decline = 0.001 # set to small number for uniform prob of spB larvae
+	max_fraction_of_larvae_spB = np.random.uniform(0,1) # max influx of spB larvae (fraction)
+	mid_point = np.random.uniform(0,n_time_steps)  # mid point of logistic decrease in influx of spB larvae
+	steepness = 1 #np.random.uniform(0,1)  # steepness of logistic decrease in influx of spB larvae
 	
-	mid_point = np.random.choice([250,500,1000,2000])
-	steepness = np.random.choice([0.001, 0.01, 0.05, 0.5]) 
-	
-	prm_logi = [mid_point,steepness] # mid point and steepness logistic decline in hybridization
-
-	replace_no_going_up=0.005
+	replace_no_going_up= 0 #np.random.uniform(0,0.1) # frequency of larvae filling empty space in the colony ladder
 
 	fraction_of_individuals_dying = 0.01 # avg fraction of individuals dying at each generation
 
-
-	"""
-	TO DO:
-
-	amount of admixture could affect death of adults (worst being 50/50 A and B) <- Beta distribution
-
-	prob of a larva from the pool to enter anemonis could be a function of admixture as well
-
-	DONE: plot individuals by colony: eg shape by hierachy, Y-axis by nDNA admixture, color by mtDNA
-
-	DONE: fraction_of_larvae_spB should be a fraction of the amount of larvae in the pool (not a probability)
-
-	DONE: Move recombination to within female/male
-
-	DONE: make hybridation rate decrease through time?
-
-	DONE plot n. pure A individuals, n. admixt and n. pure B nDNA
-	DONE plot n. pure A individuals and n. pure B mtDNA
-
-	DONE plot each individual as a proportion of A vs B
-	color circles based on mtDNA (A: blue, B: red)
-
+	print "\nrandom seed:", rseed, mid_point, steepness
+	
+	max_death_rate_hybrid = np.random.uniform(0,1)
 	
 	"""
-
-
-
-
-
+	TO DO:
+	kill larvae based on Beta distribution based on nDNA
+	
+	amount of admixture could affect death of adults (worst being 50/50 A and B) <- Beta distribution
+	
+	prob of a larva from the pool to enter anemonis could be a function of admixture as well
+	
+	DONE: plot individuals by colony: eg shape by hierachy, Y-axis by nDNA admixture, color by mtDNA
+	
+	DONE: fraction_of_larvae_spB should be a fraction of the amount of larvae in the pool (not a probability)
+	
+	DONE: Move recombination to within female/male
+	
+	DONE: make hybridation rate decrease through time?
+	
+	DONE plot n. pure A individuals, n. admixt and n. pure B nDNA
+	DONE plot n. pure A individuals and n. pure B mtDNA
+	
+	DONE plot each individual as a proportion of A vs B
+	color circles based on mtDNA (A: blue, B: red)
+	
+	
+	"""
+	
+	
+	
+	
+	
 	# relative probabilities of death 
 	# right now death is a function of hierarchy, not actual age
 	# at each generation one individual from one colony dies
 	p_death = (1/(np.linspace(1,10,colony_size)))**1 # increase exponent to skew more towards hierarchy =0
 	p_death = p_death/sum(p_death)
-
-
-
+	
+	prm_logi = [mid_point,steepness] # mid point and steepness logistic decline in hybridization
+	
 	# indexes identifying individuals across all colonies
 	individual_counter = np.arange(n_colonies*colony_size)
 	total_pop_size = float(n_colonies*colony_size)
@@ -188,6 +202,11 @@ while abc_iteration < 1000:
 		rate_at_trait = r0 / ( 1. + exp( kx )    )
 		return rate_at_trait
 
+	def calc_death_prob(admix,multi,min_d=0.001):
+		# if admix ==0.5 (max admxture) -> delta = multi*min_d
+		# if admix ==0   (min admxture) -> delta = min_d
+		delta = (admix*2)*multi + min_d
+		return(delta)
 
 	spB_nucleus = []
 	spB_mitoc = []
@@ -195,8 +214,8 @@ while abc_iteration < 1000:
 	nDNA_indBpure = []
 	hybridization_list = []
 	figures_list = []
+	summary_stats = []
 	accepted = 0 
-	acc_iter = 0
 
 	for time_step in range(n_time_steps+1):
 		# run reproduction
@@ -250,18 +269,23 @@ while abc_iteration < 1000:
 			larvae_pool_mtDNA[x,y]     = mtDNA_spB
 			hybridization_list.append(time_step)
 		
-	
-	
-		def returnLarvae(larvae_pool_nDNA,larvae_pool_mtDNA,n=1):
-			x = np.random.randint(0,n_colonies,n)
-			y = np.random.randint(0,n_larvae,  n)
-			larvae_nDNA = larvae_pool_nDNA[x,:,y,:]
-			larvae_mtDNA = larvae_pool_mtDNA[x,y]
+		def returnLarvae(larvae_pool_nDNA,larvae_pool_mtDNA, max_death_rate_hybrid,n=1):
+			while True:
+				x = np.random.randint(0,n_colonies,n)
+				y = np.random.randint(0,n_larvae,  n)
+				larvae_nDNA = larvae_pool_nDNA[x,:,y,:]
+				larvae_mtDNA = larvae_pool_mtDNA[x,y]
+				frac_a = np.size(larvae_nDNA[larvae_nDNA<=1])/np.float(np.size(larvae_nDNA))
+				admix = min(frac_a, 1-frac_a)
+				delta_prob = calc_death_prob(admix,max_death_rate_hybrid,min_d=0.001)
+				if np.random.random() > delta_prob:
+					break
+			#print delta_prob, admix, frac_a
 			return( [larvae_nDNA, larvae_mtDNA] )
 	
 	
 		rr = np.random.random(int(total_pop_size))
-		n_dead_ind = 1 #len(rr[rr<fraction_of_individuals_dying])
+		n_dead_ind = len(rr[rr<fraction_of_individuals_dying])
 	
 		if n_dead_ind >0:
 			for i in range(n_dead_ind):
@@ -273,7 +297,7 @@ while abc_iteration < 1000:
 				affected_colony_mtDNA = mtDNA[colony_ind==rnd_colony]+0
 			
 				# pick a larva
-				larva = returnLarvae(larvae_pool_nDNA,larvae_pool_mtDNA,n=1)
+				larva = returnLarvae(larvae_pool_nDNA,larvae_pool_mtDNA,max_death_rate_hybrid,n=1)
 				#if larva[1]>1: hybridization_list.append(time_step)
 
 				if np.random.random() < replace_no_going_up:
@@ -290,50 +314,39 @@ while abc_iteration < 1000:
 					affected_colony_mtDNA[colony_size-1]    = larva[1] 
 			
 			# reset global DNA variables
-			#print(affected_colony_mtDNA)
 			nDNA[:,colony_ind==rnd_colony,:] = affected_colony_nDNA
 			mtDNA[colony_ind==rnd_colony] = affected_colony_mtDNA
 
 		spB_nucleus.append( size(nDNA[nDNA<=1])/float(np.size(nDNA)))
 		spB_mitoc.append(size(mtDNA[mtDNA<=1])/float(np.size(mtDNA)))
 		
-		# sp_indx1 = np.amax(nDNA,axis=(0,2)) # if sp_indx1 >= 2: spB is present; sp_indx1 <= 1: spB is absent
-		# sp_indx2 = np.amin(nDNA,axis=(0,2)) # if sp_indx1 >= 2: spA is absent;  sp_indx1 <= 1: spA is present
-		# 
-		# sp_indx1[sp_indx1<=1] = 0
-		# sp_indx1[sp_indx1> 1] = 1
-		# sp_indx2[sp_indx2<=1] = 0
-		# sp_indx2[sp_indx2> 1] = 1
-		# nDNAadmixture =  sp_indx1+sp_indx2 # nDNAadmixture = 0 only spA, =1 admix, =2 only spB
-	
 		nDNAadmixture = nDNA+0
 		nDNAadmixture[nDNAadmixture<=1] = 0
 		nDNAadmixture[nDNAadmixture> 1] = 1
 		# print(np.shape(nDNAadmixture))
 		nDNAadmixture = np.mean(nDNAadmixture,axis=(0,2))
-		# print(len(nDNAadmixture))
-		# quit()
-		# nDNAadmixture ==0 only spA, >0 admix, ==1 only spB
-		#mtDNA
 	
 		nDNA_indApure.append(len(nDNAadmixture[nDNAadmixture==0])/total_pop_size)
 		nDNA_indBpure.append(len(nDNAadmixture[nDNAadmixture==1])/total_pop_size)
 	
 	
 		# check acceptance
-		if time_step % 10 ==0 and time_step >= 1000:  
+		if time_step % 1 ==0:  
 			mtDNA_temp = mtDNA+0
 			mtDNA_temp[mtDNA_temp<=1] = 0
 			mtDNA_temp[mtDNA_temp>1] = 1
+			if time_step % 300  ==0 and time_step>0: 
+				try: summary_stats = summary_stats + [np.sum(mtDNA_temp)/total_pop_size,np.median(nDNAadmixture),np.min(nDNAadmixture[mtDNA_temp==1])]
+				except: summary_stats = summary_stats + [np.sum(mtDNA_temp)/total_pop_size,np.median(nDNAadmixture),"NA"]
 			try:
 				#print(np.sum(mtDNA_temp),np.median(nDNAadmixture), np.min(nDNAadmixture[mtDNA_temp==0]) )
-				if np.sum(mtDNA_temp) > 0.05*total_pop_size and np.median(nDNAadmixture)< 0.2 and np.min(nDNAadmixture[mtDNA_temp==0])<0.2:
-					accepted+=1./2000
-					acc_iter +=1
+				#  fraction of spB mtDNA                        median admixture (>80% spA)       admix individuals (>80% spA) with spB mtDNA
+				if np.sum(mtDNA_temp)/total_pop_size > 0.05 and np.median(nDNAadmixture)< 0.2 and np.min(nDNAadmixture[mtDNA_temp==1])<0.2:
+					accepted+=1.
 			except:
 				pass
 	
-		if time_step % 500 ==0:  
+		if time_step % 1000 ==0:  
 			if verbose:
 				# print sum of full genome (both alleles) per individual : changes only with death/replacement
 				print("\nvalue per indvidual (nDNA):", np.sum(np.sum(nDNA,2),0))
@@ -346,32 +359,34 @@ while abc_iteration < 1000:
 			str_summary = "%s nDNA species A: %s, mtDNA: %s (freq. B larvae: %s) %s" \
 			% (time_step,size(nDNA[nDNA<=1])/float(np.size(nDNA)),size(mtDNA[mtDNA<=1])/float(np.size(mtDNA)),fraction_of_larvae_spB,accepted)
 			print(str_summary)
+			#_ if time_step>1: 
+			#_ 	try: print(np.array([np.sum(mtDNA_temp)/total_pop_size,np.median(nDNAadmixture),np.min(nDNAadmixture[mtDNA_temp==1])]))
+			#_ 	except: print(np.array([np.sum(mtDNA_temp)/total_pop_size,np.median(nDNAadmixture),np.nan]))
 	
-		if time_step % 500 ==0 and time_step>0 and accepted > 0:
-			fig, legend = get_plot([spB_nucleus, spB_mitoc, nDNA_indApure, nDNA_indBpure, hybridization_list, mtDNA, nDNAadmixture])
-			figures_list.append(fig)
-		
+		if plot:
+			if time_step % 500 ==0 and time_step>0 and accepted >= 0:
+				fig, legend = get_plot([spB_nucleus, spB_mitoc, nDNA_indApure, nDNA_indBpure, hybridization_list, mtDNA, nDNAadmixture])
+				figures_list.append(fig)
 	
-	if accepted>0: 
-		
-		file_name = "%s/plot_r%s.pdf" % (w_dir,rseed)
+	#print(summary_stats)
+	
+	if plot:
+		file_name = "%s/plots/plot_r%s.pdf" % (w_dir,rseed)
 		pdf = matplotlib.backends.backend_pdf.PdfPages(file_name)
-
+		
 		for fig in figures_list: ## will open an empty extra figure :(
 		    pdf.savefig( fig )
 		pdf.close()
-		
-		
-		log_state = map(str, (acc_iter,accepted, max_fraction_of_larvae_spB,mid_point,steepness,replace_no_going_up ))
-		mcmc_logfile.write('\t'.join(log_state)+'\n')
-		mcmc_logfile.flush()
-		
-
-
 		print(legend)
 	
-		abc_iteration+=1
 
+	if accepted>0: 
+		log_state = map(str, (abc_iteration,accepted/n_time_steps, max_fraction_of_larvae_spB,mid_point,steepness,max_death_rate_hybrid,rseed )) + map(str,summary_stats)
+		mcmc_logfile.write('\t'.join(log_state)+'\n')
+		mcmc_logfile.flush()
+		abc_iteration+=1
+	
+	abc_iter+=1
 
 
 	
