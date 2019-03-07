@@ -3,13 +3,14 @@ from numpy import *
 import numpy as np
 np.set_printoptions(suppress=True)
 np.set_printoptions(precision=3)  
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import matplotlib.axes
 import matplotlib.backends.backend_pdf
 import argparse, sys, os
 import scipy.stats
-
 p = argparse.ArgumentParser() #description='<input file>') 
 p.add_argument('-out',    type=int, help='out name', default= 1, metavar= 1)
 args = p.parse_args()
@@ -24,7 +25,7 @@ head = head + ["median_nDNAadmixture","nDNA_80spA","nDNA_80spB","mtDNA","Median_
 mcmc_logfile.write('\t'.join(head)+'\n')
 
 plot = 0 # set to 1 to run the PDF plots
-plot_end_res = 5
+plot_end_res = 10
 abc_iteration=0
 verbose = 0 
 target_samples = 1000
@@ -391,6 +392,7 @@ while abc_iteration < target_samples:
 
 	if accepted>0: 	
 		abc_iteration+=1
+		# ["median_nDNAadmixture","nDNA_80spA","nDNA_80spB","mtDNA","Median_nDNA_in_mtDNAspB","Min_nDNA_in_mtDNAspB"]
 		log_state = map(str, (abc_iteration,abc_iteration/float(abc_iter), max_fraction_of_larvae_spB,duration_hybridization,duration_after_hybridization,max_death_rate_hybrid,rseed )) + map(str,summary_stats)
 		mcmc_logfile.write('\t'.join(log_state)+'\n')
 		mcmc_logfile.flush()
